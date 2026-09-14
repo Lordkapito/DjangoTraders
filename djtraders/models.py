@@ -267,6 +267,25 @@ class Product(models.Model):
         """
         return bool(self.discontinued)
 
+    @property
+    def is_low_stock(self):
+        """
+        True when this product is at or below its own reorder_level --
+        reusing that existing field as the threshold, rather than an
+        arbitrary constant, since it's already the model's own definition
+        of "time to reorder." units_in_stock and reorder_level are both
+        nullable, so a product missing either value is never flagged (no
+        threshold to compare against). Discontinued products are never
+        flagged either -- nothing to restock. A @property, not a field,
+        computed fresh each access, same shape as is_discontinued above --
+        backs the Low Stock badge on product_list.html/product_detail.html.
+        """
+        if self.units_in_stock is None or self.reorder_level is None:
+            return False
+        if self.is_discontinued:
+            return False
+        return self.units_in_stock <= self.reorder_level
+
     @classmethod
     def search(cls, product_name="", category_id="", supplier_id="", show_all=False):
         """

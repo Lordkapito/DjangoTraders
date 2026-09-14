@@ -20,6 +20,17 @@
   4. product.is_discontinued/total_revenue/units_sold are all plain
     Python properties on Product (djtraders/models.py), read directly
     rather than recomputed here.
+  5. Units In Stock gets a Low Stock badge (dt-status-low-stock,
+    DjangoTraders.css) when product.is_low_stock is true -- same badge
+    as product_list.html's own column, and reused a third time in the
+    "More from this supplier" table below.
+  6. A Bootstrap .alert-light replaces a bare empty table when there are
+    no line items, or no (matching) supplier products.
+  7. Extra credit B -- "More from this supplier" lists supplier_products
+    (product.supplier.product_set, minus this product itself), same
+    show_all GET-param/checkbox pattern as product_list.html's own
+    "Show all products" -- default hides discontinued products, checking
+    the box brings them back in.
 -->
 {% extends "common/base.html" %}
 {% load humanize %}
@@ -59,7 +70,14 @@
                 </tr>
                 <tr>
                     <th scope="row">Units In Stock</th>
-                    <td>{{ product.units_in_stock|default:"0" }}</td>
+                    <td>
+                        {{ product.units_in_stock|default:"0" }}
+                        {% if product.is_low_stock %}
+                            <span class="badge dt-status-low-stock ms-1">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Low Stock
+                            </span>
+                        {% endif %}
+                    </td>
                 </tr>
                 <tr>
                     <th scope="row">Units On Order</th>
@@ -86,32 +104,95 @@
     </div>
 
     <h2 class="h5">Line Items</h2>
-    <table id="product-order-lines-table" class="table table-striped table-bordered table-hover align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Order #</th>
-                <th>Order Date</th>
-                <th>Unit Price</th>
-                <th>Quantity</th>
-                <th>Discount</th>
-                <th>Line Total</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {# Loops over order_lines -- every OrderDetail row for this product, across every order. #}
-            {% for line in order_lines %}
+    {% if not order_lines %}
+        <div class="alert alert-light border" role="alert">
+            <i class="fa-solid fa-circle-info dt-icon-supplier"></i>
+            This product hasn't appeared on any order yet.
+        </div>
+    {% else %}
+        <table id="product-order-lines-table" class="table table-striped table-bordered table-hover align-middle">
+            <thead class="table-dark">
                 <tr>
-                    <td><a href="{% url 'djtraders:order_detail' line.order.order_id %}">#{{ line.order.order_id }}</a></td>
-                    <td>{{ line.order.order_date|default:"—" }}</td>
-                    <td>${{ line.unit_price|floatformat:2|intcomma }}</td>
-                    <td>{{ line.quantity }}</td>
-                    <td>{{ line.discount|floatformat:2 }}</td>
-                    <td>${{ line.line_total|floatformat:2|intcomma }}</td>
+                    <th>Order #</th>
+                    <th>Order Date</th>
+                    <th>Unit Price</th>
+                    <th>Quantity</th>
+                    <th>Discount</th>
+                    <th>Line Total</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+
+            <tbody>
+                {# Loops over order_lines -- every OrderDetail row for this product, across every order. #}
+                {% for line in order_lines %}
+                    <tr>
+                        <td><a href="{% url 'djtraders:order_detail' line.order.order_id %}">#{{ line.order.order_id }}</a></td>
+                        <td>{{ line.order.order_date|default:"—" }}</td>
+                        <td>${{ line.unit_price|floatformat:2|intcomma }}</td>
+                        <td>{{ line.quantity }}</td>
+                        <td>{{ line.discount|floatformat:2 }}</td>
+                        <td>${{ line.line_total|floatformat:2|intcomma }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {# Extra credit B: other products from this same supplier. Skipped #}
+    {# entirely when the product has no supplier on record (nullable FK). #}
+    {% if product.supplier %}
+        <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+            <h2 class="h5 mb-0">More from {{ product.supplier.company_name }}</h2>
+            <form method="get" class="form-check text-nowrap mb-0">
+                <input type="checkbox"
+                       name="show_all"
+                       id="show-all-supplier-products"
+                       class="form-check-input"
+                       onchange="this.form.submit()"
+                       {% if show_all %}checked{% endif %}>
+                <label class="form-check-label" for="show-all-supplier-products">Show discontinued products</label>
+            </form>
+        </div>
+
+        {% if not supplier_products %}
+            <div class="alert alert-light border" role="alert">
+                <i class="fa-solid fa-circle-info dt-icon-supplier"></i>
+                {% if show_all %}
+                    This supplier has no other products on record.
+                {% else %}
+                    This supplier has no other active products right now -- check "Show discontinued products" to see the rest of their catalog.
+                {% endif %}
+            </div>
+        {% else %}
+            <table class="table table-striped table-bordered table-hover align-middle">
+                <thead class="table-secondary">
+                    <tr>
+                        <th class="py-2">Product Name</th>
+                        <th class="py-2">Unit Price</th>
+                        <th class="py-2">Units In Stock</th>
+                        <th class="py-2 text-center">Discontinued</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sibling in supplier_products %}
+                        <tr>
+                            <td><a href="{% url 'djtraders:product_detail' sibling.product_id %}">{{ sibling.product_name }}</a></td>
+                            <td>{% if sibling.unit_price is not None %}${{ sibling.unit_price|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                            <td>
+                                {{ sibling.units_in_stock }}
+                                {% if sibling.is_low_stock %}
+                                    <span class="badge dt-status-low-stock ms-1">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> Low Stock
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ sibling.is_discontinued|yesno:"Yes,No" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}

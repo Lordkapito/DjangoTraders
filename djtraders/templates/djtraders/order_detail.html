@@ -4,23 +4,46 @@
     order_lines (order.orderdetail_set) is a reverse relationship, and
     each line reaches its own Product through another forward FK.
 
-    Customer/Order Info/Line Items are all plain <table>s. DataTables
-    only turns a table into a sortable/searchable one when a template
-    explicitly calls a Make*DataTable() function on its id (see
+    Customer/Assigned To/Order Timeline/Ship To are all plain <table>s.
+    DataTables only turns a table into a sortable/searchable one when a
+    template explicitly calls a Make*DataTable() function on its id (see
     base.html) -- only Line Items does that here.
+
+    UI/UX pass (Requirement 4): this page previously stacked four
+    full-width cards with no grouping, unlike customer_detail.html's own
+    two-column layout. Regrouped into a 2x2 card grid (row/col-md-6, same
+    shape as customer_detail.html's row/col-md-8+4) so related fields sit
+    together -- who placed it next to who's handling it, and when it
+    happened next to where it's going -- instead of one long undifferen-
+    tiated scroll. Follows Jakob's Law: reusing customer_detail.html's
+    own card/row/col pattern here means a returning user already knows
+    how to read this page before they've read a single row of it.
 
   1. "Back to..." buttons use dt-btn-secondary-customer (DjangoTraders.css)
     for their color, wrapped in dt-link-wrap (base.html) per the
     project's link-styling convention.
   2. Line Items activated via MakeOrderDetailsDataTable (DjangoTraders.js).
-  3. Product is plain text, not a link -- product_detail is left as an
-    assignment component (see djtraders/urls.py).
-  4. Customer/Order Info use Bootstrap's .card/.card-header, not w3-card,
-    so DjangoTraders.css's project-wide card styling applies.
-  5. Customer/Order Info rows are a plain <table> (th/td pairs), simpler
-    markup than a row of label/value divs for the same content.
-  6. Order number and the back button share one dt-navbar, instead of a
-    bare heading with the button below Line Items.
+  3. Product is plain text, not a link -- product_detail.html is what
+    completes that traversal (its own Line Items table links back to
+    order_detail), so this direction stays text-only rather than a
+    circular link.
+  4. Customer/Assigned To/Order Timeline/Ship To use Bootstrap's
+    .card/.card-header (fw-bolder h4, matching customer_detail.html's own
+    card headers exactly), not w3-card, so DjangoTraders.css's
+    project-wide card styling applies.
+  5. Card rows are plain <table>s (th/td pairs), simpler markup than a
+    row of label/value divs for the same content.
+  6. Order number, a shipped/pending status badge, and the back button
+    share one dt-navbar, instead of a bare heading with the button below
+    Line Items. The badge reuses dt-status-progress ("Shipped") and
+    dt-status-pending ("Pending Shipment") -- the exact same classes
+    DjangoTraders.css already defines for this purpose, paired with
+    Bootstrap's own .badge (the same pairing dt-status-inactive uses on
+    Customer Detail) -- no new CSS needed for this page.
+  7. Extra credit A: Assigned To shows order.employee's name and
+    order.ship_via's company name -- both forward FKs the view already
+    passes in. Both are SET_NULL, so a missing one shows "Not yet
+    assigned" instead of a blank cell or template error.
 -->
 {% extends "common/base.html" %}
 {% load humanize %}
@@ -30,7 +53,18 @@
 {% block content %}
     <div class="navbar dt-navbar dt-navbar-accent border-bottom border-3 shadow rounded-3 my-3 px-4 py-2">
         <div class="nav">
-            <h1 class="h4 mb-0">Order #{{ order.order_id }}</h1>
+            <h1 class="h4 mb-0">
+                Order #{{ order.order_id }}
+                {% if order.shipped_date %}
+                    <span class="badge dt-status-progress">
+                        <i class="fa-solid fa-truck"></i> Shipped
+                    </span>
+                {% else %}
+                    <span class="badge dt-status-pending">
+                        <i class="fa-solid fa-clock"></i> Pending Shipment
+                    </span>
+                {% endif %}
+            </h1>
         </div>
 
         <div class="dt-link-wrap btn dt-btn-secondary-customer w3-hover-shadow">
@@ -42,95 +76,145 @@
         </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header">Customer</div>
-        {# Order.customer is nullable (SET_NULL) -- an order can outlive its customer record. #}
-        {% if order.customer %}
-            <table class="table mb-0">
-                <tbody>
-                    <tr>
-                        <th scope="row">Company Name</th>
-                        <td>
-                            <a href="{% url 'djtraders:customer_detail' order.customer.customer_id %}">{{ order.customer.company_name }}</a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Contact Name</th>
-                        <td>{{ order.customer.contact_name|default:"—" }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        {% else %}
-            <div class="p-3">This order has no customer on record.</div>
-        {% endif %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-header fw-bolder h4">Customer</div>
+                {# Order.customer is nullable (SET_NULL) -- an order can outlive its customer record. #}
+                {% if order.customer %}
+                    <table class="table mb-0">
+                        <tbody>
+                            <tr>
+                                <th scope="row">Company Name</th>
+                                <td>
+                                    <a href="{% url 'djtraders:customer_detail' order.customer.customer_id %}">{{ order.customer.company_name }}</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Contact Name</th>
+                                <td>{{ order.customer.contact_name|default:"—" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="p-3">This order has no customer on record.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-header fw-bolder h4">Assigned To</div>
+                <table class="table mb-0">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Employee</th>
+                            <td>
+                                {% if order.employee %}
+                                    {{ order.employee.first_name }} {{ order.employee.last_name }}
+                                {% else %}
+                                    Not yet assigned
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Shipper</th>
+                            <td>
+                                {% if order.ship_via %}
+                                    {{ order.ship_via.company_name }}
+                                {% else %}
+                                    Not yet assigned
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <div class="card mb-3">
-        <div class="card-header">Order Info</div>
-        <table class="table mb-0">
-            <tbody>
-                <tr>
-                    <th scope="row">Order Date</th>
-                    <td>{{ order.order_date|default:"—" }}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Required Date</th>
-                    <td>{{ order.required_date|default:"—" }}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Shipped Date</th>
-                    <td>{{ order.shipped_date|default:"—" }}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Employee</th>
-                    <td>{% if order.employee %}{{ order.employee.first_name }} {{ order.employee.last_name }}{% else %}—{% endif %}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Shipper</th>
-                    <td>{{ order.ship_via.company_name|default:"—" }}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Freight</th>
-                    <td>{% if order.freight is not None %}${{ order.freight|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
-                </tr>
-                <tr>
-                    <th scope="row">Ship To</th>
-                    <td>
-                        {{ order.ship_name|default:"—" }}<br>
-                        {{ order.ship_address }}<br>
-                        {{ order.ship_city }}{% if order.ship_region %}, {{ order.ship_region }}{% endif %} {{ order.ship_postal_code }}<br>
-                        {{ order.ship_country }}
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-header fw-bolder h4">Order Timeline</div>
+                <table class="table mb-0">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Order Date</th>
+                            <td>{{ order.order_date|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Required Date</th>
+                            <td>{{ order.required_date|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Shipped Date</th>
+                            <td>{{ order.shipped_date|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Freight</th>
+                            <td>{% if order.freight is not None %}${{ order.freight|floatformat:2|intcomma }}{% else %}—{% endif %}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-3 border-0 shadow-sm">
+                <div class="card-header fw-bolder h4">Ship To</div>
+                <table class="table mb-0">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Name</th>
+                            <td>{{ order.ship_name|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Address</th>
+                            <td>
+                                {{ order.ship_address|default:"—" }}<br>
+                                {{ order.ship_city }}{% if order.ship_region %}, {{ order.ship_region }}{% endif %} {{ order.ship_postal_code }}<br>
+                                {{ order.ship_country }}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <h2 class="h5">Line Items</h2>
-    <table id="order-details-table" class="table table-striped table-bordered table-hover align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Product</th>
-                <th>Unit Price</th>
-                <th>Quantity</th>
-                <th>Discount</th>
-                <th>Line Total</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            {# Loops over order_lines -- annotated in the view with a per-row line_total. #}
-            {% for line in order_lines %}
+    {% if not order_lines %}
+        <div class="alert alert-light border" role="alert">
+            <i class="fa-solid fa-circle-info dt-icon"></i>
+            This order has no line items on record.
+        </div>
+    {% else %}
+        <table id="order-details-table" class="table table-striped table-bordered table-hover align-middle">
+            <thead class="table-dark">
                 <tr>
-                    <td>{{ line.product.product_name }}</td>
-                    <td>${{ line.unit_price|floatformat:2|intcomma }}</td>
-                    <td>{{ line.quantity }}</td>
-                    <td>{{ line.discount|floatformat:2 }}</td>
-                    <td>${{ line.line_total|floatformat:2|intcomma }}</td>
+                    <th>Product</th>
+                    <th>Unit Price</th>
+                    <th>Quantity</th>
+                    <th>Discount</th>
+                    <th>Line Total</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+
+            <tbody>
+                {# Loops over order_lines -- annotated in the view with a per-row line_total. #}
+                {% for line in order_lines %}
+                    <tr>
+                        <td>{{ line.product.product_name }}</td>
+                        <td>${{ line.unit_price|floatformat:2|intcomma }}</td>
+                        <td>{{ line.quantity }}</td>
+                        <td>{{ line.discount|floatformat:2 }}</td>
+                        <td>${{ line.line_total|floatformat:2|intcomma }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}

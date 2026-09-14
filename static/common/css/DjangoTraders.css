@@ -61,6 +61,14 @@
    8. dt-status-inactive is a dark-red badge (--dt-danger) for an
         inactive customer, same base/color shape as the existing
         dt-status-neutral/progress/pending tags.
+   9. dt-status-low-stock is a gold badge (same color pair as
+        dt-status-pending) for a Product at or below its reorder_level
+        (Product.is_low_stock, djtraders/models.py) -- paired with
+        Bootstrap's own .badge class, same as dt-status-inactive is on
+        Customer Detail (class="badge dt-status-low-stock"), not the
+        .dt-status wrapper above -- that wrapper duplicates .badge's own
+        shape/padding, so the project's actual convention is .badge on
+        the span plus a dt-status-* color rule.
    ========================================================================== */
 
 :root {
@@ -381,6 +389,7 @@
 .dt-status-progress { background: var(--dt-steel-tint); color: var(--dt-steel); }           /* e.g. "In Transit" */
 .dt-status-pending  { background: var(--dt-gold-tint);  color: var(--dt-gold-text); }       /* e.g. "Pending" */
 .dt-status-inactive { background: var(--dt-danger);     color: var(--dt-white); }           /* e.g. an inactive customer */
+.dt-status-low-stock { background: var(--dt-gold-tint); color: var(--dt-gold-text); }       /* e.g. a product at/below its reorder_level */
 
 /* ==========================================================================
    Filter chips — the small pill buttons used to filter a list

@@ -196,9 +196,30 @@ def product_detail(request, product_id):
         "-order__order_date"
     )
 
+    # Extra credit B: other products from this same supplier.
+    # supplier.product_set is the reverse side of Product.supplier's own
+    # FK. exclude(pk=product.pk) drops this product itself out of its own
+    # "More from this supplier" list. show_all follows the exact same
+    # GET-param/checkbox pattern as product_list's own show_all -- default
+    # hides discontinued products (filtered on the real discontinued
+    # field, not the is_discontinued property, same reasoning as
+    # Product.search's own show_all handling), checking the box brings
+    # them back in. product.supplier is nullable (SET_NULL), so this is
+    # skipped entirely when there's no supplier to look up.
+    show_all = request.GET.get("show_all") == "on"
+    supplier_products = None
+    if product.supplier:
+        supplier_products = product.supplier.product_set.exclude(
+            pk=product.pk
+        ).order_by("product_name")
+        if not show_all:
+            supplier_products = supplier_products.filter(discontinued=0)
+
     context = {
         "product": product,
         "order_lines": order_lines,
+        "supplier_products": supplier_products,
+        "show_all": show_all,
     }
     return render(request, "djtraders/product_detail.html", context)
 
