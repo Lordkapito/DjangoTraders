@@ -29,6 +29,10 @@
     sorting on this column (it holds an icon, not sortable data).
   5. City/Contact Title/Country dropdowns each submit the search on
     change (onchange="this.form.submit()"), no need to also click Search.
+  6. Results table has a Title column (customer.contact_title) alongside
+    Contact Name/City -- every field the search form can filter by
+    (Contact Name, City, Title) is also shown as its own column, not
+    just Company Name/City/Country from before.
 -->
 {% extends "common/base.html" %}
 
@@ -110,6 +114,7 @@
                 <tr>
                     <th>Company Name</th>
                     <th>Contact Name</th>
+                    <th>Title</th>
                     <th>City</th>
                     <th>Country</th>
                     <th class="text-center">Actions</th>
@@ -122,6 +127,7 @@
                     <tr>
                         <td><a href="{% url 'djtraders:customer_detail' customer.customer_id %}">{{ customer.company_name }}</a></td>
                         <td>{{ customer.contact_name }}</td>
+                        <td>{{ customer.contact_title }}</td>
                         <td>{{ customer.city }}</td>
                         <td>{{ customer.country }}</td>
                         <td class="text-center">

@@ -183,18 +183,21 @@ def product_detail(request, product_id):
 
     product.orderdetail_set is the reverse side of OrderDetail.product's
     FK -- every OrderDetail row referencing this product, across every
-    order. select_related("order") fetches each line's Order via a JOIN
-    in this same query, instead of a separate query per line, since the
-    template touches order.order_id/order.order_date for every row.
-    total_revenue/units_sold are plain Python properties on Product
-    (djtraders/models.py) that already sum/count across this same
-    relation, so this view just reads them rather than recomputing.
+    order. select_related("order", "order__customer") fetches each
+    line's Order AND that order's Customer via one JOIN in this same
+    query, instead of a separate query per line/customer, since the
+    template touches order.order_id/order.order_date/order.customer for
+    every row (Requirement 3's "who bought it" two-hop traversal:
+    line -> order -> customer). total_revenue/units_sold are plain
+    Python properties on Product (djtraders/models.py) that already
+    sum/count across this same relation, so this view just reads them
+    rather than recomputing.
     """
     product = get_object_or_404(Product, pk=product_id)
 
-    order_lines = product.orderdetail_set.select_related("order").order_by(
-        "-order__order_date"
-    )
+    order_lines = product.orderdetail_set.select_related(
+        "order", "order__customer"
+    ).order_by("-order__order_date")
 
     # Extra credit B: other products from this same supplier.
     # supplier.product_set is the reverse side of Product.supplier's own
